@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance Pro v3.1</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --danger: #dc3545;
+            --success: #28a745;
+            --dark: #1c1e21;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background:#f0f2f5; margin: 0; padding: 0; color: var(--dark); line-height: 1.4; }
+        
+        nav { 
+            background: white; padding: 10px 20px; display: flex; gap: 15px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1000;
+        }
+        .nav-link { 
+            padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: bold; color: #666; transition: 0.3s;
+        }
+        .nav-link.active { background: var(--primary); color: white; }
+
+        .container { max-width: 1000px; margin: 20px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        
+        .page { display: none; }
+        .page.active { display: block; }
+
+        h2 { color: var(--primary); margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        input, textarea, button { width:100%; padding:12px; margin:8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        
+        .btn { background: var(--primary); color:white; border:none; cursor:pointer; font-weight: bold; width: auto; padding: 10px 25px; }
+        .btn-danger { background: var(--danger); color:white; border:none; }
+        .btn-green { background: var(--success); color:white; border:none; }
+        .btn-outline { background: #6c757d; color: white; border: none; }
+        
+        table { width:100%; border-collapse:collapse; margin-top:15px; }
+        th, td { border-bottom:1px solid #eee; padding:12px; text-align: left; vertical-align: top; }
+        th { background:#f8f9fa; font-size: 12px; text-transform: uppercase; color: #888; }
+        
+        .photo-preview { border-radius: 50%; object-fit: cover; background: #eee; border: 1px solid #ddd; }
+        .timestamp-list { font-size: 11px; font-weight: bold; color: #444; margin-bottom: 5px; }
+
+        .camera-box { background: #000; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 15px; min-height: 50px; }
+        video { width: 100%; max-width: 350px; border-radius: 8px; transform: scaleX(-1); }
+
+        .flex-group { display: flex; gap: 10px; }
+
+        @media print {
+            nav, .no-print, button, .camera-box, hr { display: none !important; }
+            body { background: white; }
+            .container { box-shadow: none; margin: 0; width: 100%; }
+            .page { display: none !important; }
+            .page.active { display: block !important; }
+            h2 { border: none; text-align: center; color: black; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="no-print">
+    <div class="nav-link active" onclick="showPage('attendance-page', this)">📅 Attendance</div>
+    <div class="nav-link" onclick="showPage('edit-page', this)">👥 Manage Students</div>
+    <div class="nav-link" onclick="showPage('system-page', this)">⚙️ Settings</div>
+</nav>
+
+<div class="container">
+    
+    <section id="attendance-page" class="page active">
+        <h2>Daily Attendance: <span id="display-date"></span></h2>
+        <div class="no-print">
+            <input type="text" id="attSearch" onkeyup="filterTable('att-body', this.value)" placeholder="🔍 Search by name...">
+        </div>
+        <table>
+            <thead>
+                <tr><th>Photo</th><th>Name</th><th>In Logs</th><th>Out Logs</th></tr>
+            </thead>
+            <tbody id="att-body"></tbody>
+        </table>
+        <button class="btn no-print" style="margin-top: 20px;" onclick="window.print()">Print Attendance</button>
+    </section>
+
+    <section id="edit-page" class="page">
+        <h2 id="form-title">Student Management</h2>
+        
+        <div class="no-print" style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e1e4e8;">
+            <h3 id="mode-label" style="margin-top:0">Register New Student</h3>
+            <input id="sName" placeholder="Full Name">
+            <div class="flex-group">
+                <input id="sPhone" placeholder="Parent Phone">
+                <input id="sDOB" type="date" title="Date of Birth">
+            </div>
+            
+            <div class="camera-box">
+                <video id="video" autoplay playsinline style="display:none;"></video>
+                <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+                
+                <div class="flex-group" style="justify-content: center; margin-bottom: 10px;">
+                    <button class="btn-outline no-print" id="start-cam" onclick="initCamera()">Use Camera</button>
+                    <button class="btn-outline no-print" onclick="document.getElementById('fileInput').click()">Upload Photo</button>
+                    <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileUpload(event)">
+                </div>
+                
+                <button class="btn-green no-print" id="snap" style="display:none;" onclick="takeSnapshot()">Capture Now</button>
+                <img id="preview" class="photo-preview" width="80" height="80" style="display:none; margin: 10px auto;">
+            </div>
+
+            <button class="btn" id="save-btn" onclick="saveStudent()">Save Student Profile</button>
+            <button class="btn-danger" id="cancel-btn" style="display:none;" onclick="resetForm()">Cancel Edit</button>
+        </div>
+
+        <h3>Student Directory</h3>
+        <input type="text" class="no-print" onkeyup="filterTable('dir-body', this.value)" placeholder="🔍 Search directory...">
+        <table>
+            <thead>
+                <tr><th>Photo</th><th>Name</th><th>DOB</th><th>Phone</th><th class="no-print">Actions</th></tr>
+            </thead>
+            <tbody id="dir-body"></tbody>
+        </table>
+        <button class="btn no-print" style="margin-top: 20px;" onclick="window.print()">Print Directory</button>
+    </section>
+
+    <section id="system-page" class="page">
+        <h2>System Settings</h2>
+        <button class="btn-green" onclick="exportData()">Backup Data (JSON)</button>
+        <button class="btn" onclick="document.getElementById('import').click()">Restore Data</button>
+        <input type="file" id="import" style="display:none" onchange="importData(event)">
+        <button class="btn-danger" style="margin-top: 50px;" onclick="clearSystem()">Wipe All Data</button>
+    </section>
+
+</div>
+
+<script>
+    let students = JSON.parse(localStorage.getItem("students") || "[]");
+    let attendance = JSON.parse(localStorage.getItem("attendance") || "{}");
+    let editIdx = null;
+    let photoData = "";
+    let stream = null;
+
+    const getToday = () => new Date().toISOString().split('T')[0];
+    document.getElementById('display-date').innerText = new Date().toLocaleDateString();
+
+    function showPage(id, el) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        el.classList.add('active');
+        if (stream) stopCamera();
+        render();
+    }
+
+    function render() {
+        renderAttendance();
+        renderDirectory();
+    }
+
+    function renderAttendance() {
+        let day = getToday();
+        if (!attendance[day]) attendance[day] = {};
+        document.getElementById('att-body').innerHTML = students.map(s => {
+            let log = attendance[day][s.name] || { IN: [], OUT: [] };
+            return `<tr>
+                <td><img src="${s.photo || ''}" width="40" height="40" class="photo-preview" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNhYWEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNGgtNGE0IDQgMCAwIDAtNCA0djIiPjwvcGF0aD48Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiPjwvY2lyY2xlPjwvc3ZnPg=='"></td>
+                <td><strong>${s.name}</strong></td>
+                <td>
+                    <div class="timestamp-list">${log.IN.join("<br>")}</div>
+                    <button class="btn-green no-print" style="padding:4px 8px; font-size:10px; width:auto;" onclick="mark('${s.name.replace(/'/g, "\\'")}','IN')">+ IN</button>
+                </td>
+                <td>
+                    <div class="timestamp-list">${log.OUT.join("<br>")}</div>
+                    <button class="btn-danger no-print" style="padding:4px 8px; font-size:10px; width:auto;" onclick="mark('${s.name.replace(/'/g, "\\'")}','OUT')">+ OUT</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderDirectory() {
+        document.getElementById('dir-body').innerHTML = students.map((s, i) => `
+            <tr>
+                <td><img src="${s.photo || ''}" width="40" height="40" class="photo-preview" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNhYWEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNGgtNGE0IDQgMCAwIDAtNCA0djIiPjwvcGF0aD48Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiPjwvY2lyY2xlPjwvc3ZnPg=='"></td>
+                <td>${s.name}</td>
+                <td>${s.dob || '--'}</td>
+                <td>${s.phone || '--'}</td>
+                <td class="no-print">
+                    <button class="btn" style="padding:5px 10px;" onclick="editStudent(${i})">Edit</button>
+                    <button class="btn-danger" style="padding:5px 10px;" onclick="delStudent(${i})">Del</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function mark(name, type) {
+        let day = getToday();
+        let time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        if (!attendance[day][name]) attendance[day][name] = { IN: [], OUT: [] };
+        attendance[day][name][type].push(time);
+        localStorage.setItem("attendance", JSON.stringify(attendance));
+        renderAttendance();
+    }
+
+    function saveStudent() {
+        let name = document.getElementById('sName').value.trim();
+        if(!name) return alert("Please enter a name");
+        let student = { 
+            name, 
+            phone: document.getElementById('sPhone').value, 
+            dob: document.getElementById('sDOB').value,
+            photo: photoData 
+        };
+        
+        if(editIdx !== null) students[editIdx] = student;
+        else students.push(student);
+        
+        localStorage.setItem("students", JSON.stringify(students));
+        resetForm();
+        render();
+    }
+
+    function editStudent(i) {
+        editIdx = i;
+        let s = students[i];
+        document.getElementById('sName').value = s.name;
+        document.getElementById('sPhone').value = s.phone;
+        document.getElementById('sDOB').value = s.dob || "";
+        photoData = s.photo;
+        if(photoData) {
+            document.getElementById('preview').src = photoData;
+            document.getElementById('preview').style.display = 'block';
+        }
+        document.getElementById('mode-label').innerText = "Edit Student Profile";
+        document.getElementById('save-btn').innerText = "Update Profile";
+        document.getElementById('cancel-btn').style.display = 'inline-block';
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoData = e.target.result;
+            document.getElementById('preview').src = photoData;
+            document.getElementById('preview').style.display = 'block';
+            stopCamera();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function initCamera() {
+        document.getElementById('video').style.display = 'block';
+        document.getElementById('snap').style.display = 'inline-block';
+        document.getElementById('start-cam').innerText = "Switch Off Camera";
+        document.getElementById('start-cam').onclick = stopCamera;
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById('video').srcObject = stream;
+    }
+
+    function stopCamera() {
+        if(stream) stream.getTracks().forEach(t => t.stop());
+        document.getElementById('video').style.display = 'none';
+        document.getElementById('snap').style.display = 'none';
+        document.getElementById('start-cam').innerText = "Use Camera";
+        document.getElementById('start-cam').onclick = initCamera;
+        stream = null;
+    }
+
+    function takeSnapshot() {
+        const canvas = document.getElementById('canvas');
+        canvas.getContext('2d').drawImage(document.getElementById('video'), 0, 0, 320, 240);
+        photoData = canvas.toDataURL('image/jpeg', 0.7);
+        document.getElementById('preview').src = photoData;
+        document.getElementById('preview').style.display = 'block';
+        stopCamera();
+    }
+
+    function resetForm() {
+        editIdx = null; photoData = "";
+        document.getElementById('sName').value = "";
+        document.getElementById('sPhone').value = "";
+        document.getElementById('sDOB').value = "";
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('mode-label').innerText = "Register New Student";
+        document.getElementById('save-btn').innerText = "Save Student Profile";
+        document.getElementById('cancel-btn').style.display = 'none';
+        stopCamera();
+    }
+
+    function filterTable(tbodyId, val) {
+        let rows = document.querySelectorAll(`#${tbodyId} tr`);
+        rows.forEach(r => r.style.display = r.innerText.toLowerCase().includes(val.toLowerCase()) ? "" : "none");
+    }
+
+    function delStudent(i) { if(confirm("Delete this student?")) { students.splice(i,1); localStorage.setItem("students", JSON.stringify(students)); render(); } }
+    
+    function exportData() {
+        let data = JSON.stringify({students, attendance});
+        let blob = new Blob([data], {type: 'application/json'});
+        let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'attendance_backup.json'; a.click();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = JSON.parse(e.target.result);
+            students = data.students || [];
+            attendance = data.attendance || {};
+            localStorage.setItem("students", JSON.stringify(students));
+            localStorage.setItem("attendance", JSON.stringify(attendance));
+            render();
+            alert("Data restored successfully!");
+        };
+        reader.readAsText(file);
+    }
+
+    function clearSystem() { if(confirm("WIPE ALL DATA FOREVER?")) { localStorage.clear(); location.reload(); } }
+
+    render();
+</script>
+</body>
+</html>
