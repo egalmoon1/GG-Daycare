@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GG Childcare - v4.0</title>
+    <style>
+        :root { --primary: #007bff; --danger: #dc3545; --success: #28a745; --dark: #1c1e21; }
+        body { font-family: 'Segoe UI', sans-serif; background:#f0f2f5; margin: 0; padding: 0; color: var(--dark); }
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f2f5; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        nav { background: white; padding: 10px 20px; display: flex; gap: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1000; }
+        .nav-link { padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: bold; color: #666; }
+        .nav-link.active { background: var(--primary); color: white; }
+        .container { max-width: 1000px; margin: 20px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .page { display: none; }
+        .page.active { display: block; }
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 14px; color: #555; }
+        input, button, select { width:100%; padding:12px; margin:5px 0 15px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .btn { background: var(--primary); color:white; border:none; cursor:pointer; font-weight: bold; width: auto; padding: 12px 30px; }
+        .btn-danger { background: var(--danger); color:white; border:none; }
+        .btn-green { background: var(--success); color:white; border:none; }
+        .btn-outline { background: #6c757d; color: white; border: none; width: auto; }
+        table { width:100%; border-collapse:collapse; margin-top:15px; }
+        th, td { border-bottom:1px solid #eee; padding:12px; text-align: left; vertical-align: top; }
+        .photo-preview { border-radius: 50%; object-fit: cover; background: #eee; border: 1px solid #ddd; }
+        .camera-box { background: #000; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 15px; }
+        video { width: 100%; max-width: 300px; border-radius: 8px; transform: scaleX(-1); }
+        @media print { nav, .no-print, button, .camera-box { display: none !important; } body { background: white; } .container { box-shadow: none; margin: 0; width: 100%; } .page { display: none !important; } .page.active { display: block !important; } }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="container" style="max-width:400px; text-align:center;">
+        <h2 style="color:var(--primary); margin-bottom: 20px;">GG Childcare Login</h2>
+        <input type="text" id="login-user" placeholder="Username">
+        <input type="password" id="login-pass" placeholder="Password">
+        <button class="btn" style="width:100%" onclick="handleLogin()">Login</button>
+        <p id="login-error" style="color:red; margin-top:10px; font-size: 14px;"></p>
+    </div>
+</div>
+
+<nav id="main-nav" class="no-print" style="display:none;">
+    <div class="nav-link active" onclick="showPage('attendance-page', this)">📅 Attendance</div>
+    <div id="nav-manage" class="nav-link" onclick="showPage('edit-page', this)">👥 Manage Students</div>
+    <div id="nav-system" class="nav-link" onclick="showPage('system-page', this)">⚙️ Settings</div>
+    <div class="nav-link" onclick="location.reload()" style="margin-left:auto; color:var(--danger)">Logout 🚪</div>
+</nav>
+
+<div class="container" id="app-content" style="display:none;">
+    <section id="attendance-page" class="page active">
+        <h2>Daily Attendance: <span id="display-date"></span></h2>
+        <input type="text" onkeyup="filterTable('att-body', this.value)" placeholder="🔍 Search students...">
+        <table>
+            <thead><tr><th>Photo</th><th>Name</th><th>Logs</th></tr></thead>
+            <tbody id="att-body"></tbody>
+        </table>
+        <button class="btn no-print" onclick="window.print()">Print Report</button>
+    </section>
+
+    <section id="edit-page" class="page">
+        <h2 id="mode-label">Register Student</h2>
+        <div class="no-print" style="background:#f8f9fa; padding:20px; border-radius:12px; border:1px solid #ddd; margin-bottom:20px;">
+            <label>Student Full Name</label>
+            <input id="sName" placeholder="e.g. John Doe">
+            
+            <label>Date of Birth</label>
+            <input type="date" id="sDOB">
+            
+            <label>Parent Phone</label>
+            <input id="sPhone" placeholder="000-000-0000">
+
+            <div class="camera-box">
+                <video id="video" autoplay playsinline style="display:none;"></video>
+                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:10px;">
+                    <button class="btn-outline" onclick="initCamera()">📸 Camera</button>
+                    <button class="btn-outline" onclick="document.getElementById('fileInput').click()">📁 File</button>
+                    <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileUpload(event)">
+                </div>
+                <button class="btn-green" id="snap" style="display:none" onclick="takeSnapshot()">Capture</button>
+                <img id="preview" class="photo-preview" width="80" height="80" style="display:none; margin: 10px auto;">
+            </div>
+            <button class="btn" style="width:100%" onclick="saveStudent()">Save Profile</button>
+            <button class="btn-danger" id="cancel-btn" style="display:none; width:100%; margin-top:10px;" onclick="resetForm()">Cancel</button>
+        </div>
+        <table>
+            <thead><tr><th>Photo</th><th>Name (DOB)</th><th>Phone</th><th>Actions</th></tr></thead>
+            <tbody id="dir-body"></tbody>
+        </table>
+    </section>
+
+    <section id="system-page" class="page">
+        <h2>System Settings</h2>
+        <div style="background:#eef2f7; padding:15px; border-radius:10px; margin-bottom:20px;">
+            <h3>User Passwords</h3>
+            <select id="user-select">
+                <option value="admin">admin</option><option value="admin2">admin2</option>
+                <option value="user1">user1</option><option value="user2">user2</option>
+                <option value="user3">user3</option><option value="user4">user4</option>
+            </select>
+            <input id="edit-pass" placeholder="New Password">
+            <button class="btn-green" onclick="updateUserPass()">Save Password</button>
+        </div>
+        <button class="btn" onclick="exportData()">Download Backup</button>
+        <button class="btn-outline" onclick="document.getElementById('importFile').click()">Restore Backup</button>
+        <input type="file" id="importFile" style="display:none" onchange="restoreData(event)">
+    </section>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCilsByZGTa2XIyOd_99Pg_-tU12Pkhzw0",
+        authDomain: "ggchildcare2.firebaseapp.com",
+        databaseURL: "https://ggchildcare2-default-rtdb.firebaseio.com",
+        projectId: "ggchildcare2",
+        storageBucket: "ggchildcare2.firebasestorage.app",
+        messagingSenderId: "993217340824",
+        appId: "1:993217340824:web:54f9e4f4dbef878bf0b7ed"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let users = { "admin":"admin123", "admin2":"admin456", "user1":"111", "user2":"222", "user3":"333", "user4":"444" };
+    window.students = []; window.attendance = {}; window.photoData = ""; window.currentEditId = null;
+
+    onValue(ref(db), (snap) => {
+        const data = snap.val() || {};
+        if (data.users) users = data.users;
+        window.students = data.students ? Object.entries(data.students).map(([id, val]) => ({...val, id})) : [];
+        window.attendance = data.attendance || {};
+        render();
+    });
+
+    window.handleLogin = () => {
+        const u = document.getElementById('login-user').value.trim();
+        const p = document.getElementById('login-pass').value.trim();
+        if (users[u] === p) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('main-nav').style.display = 'flex';
+            document.getElementById('app-content').style.display = 'block';
+            if (u !== 'admin' && u !== 'admin2') {
+                document.getElementById('nav-manage').style.display = 'none';
+                document.getElementById('nav-system').style.display = 'none';
+            }
+        } else {
+            document.getElementById('login-error').innerText = "Access Denied.";
+        }
+    };
+
+    window.render = () => {
+        const day = new Date().toISOString().split('T')[0];
+        document.getElementById('display-date').innerText = new Date().toLocaleDateString();
+        
+        document.getElementById('att-body').innerHTML = window.students.map(s => {
+            const log = (window.attendance[day] && window.attendance[day][s.id]) || { IN: [], OUT: [] };
+            return `<tr>
+                <td><img src="${s.photo || ''}" width="40" height="40" class="photo-preview"></td>
+                <td><b>${s.name}</b></td>
+                <td>
+                    <button class="btn-green no-print" onclick="mark('${s.id}','IN')">IN</button> ${log.IN ? log.IN.join(", ") : ""} <br>
+                    <button class="btn-danger no-print" onclick="mark('${s.id}','OUT')">OUT</button> ${log.OUT ? log.OUT.join(", ") : ""}
+                </td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('dir-body').innerHTML = window.students.map(s => `
+            <tr>
+                <td><img src="${s.photo || ''}" width="40" height="40" class="photo-preview"></td>
+                <td>${s.name}<br><small>DOB: ${s.dob || 'N/A'}</small></td>
+                <td>${s.phone || 'N/A'}</td>
+                <td><button class="btn" onclick="editStudent('${s.id}')">Edit</button> <button class="btn-danger" onclick="delStudent('${s.id}')">Del</button></td>
+            </tr>
+        `).join('');
+    };
+
+    window.saveStudent = () => {
+        const name = document.getElementById('sName').value.trim();
+        const dob = document.getElementById('sDOB').value;
+        const phone = document.getElementById('sPhone').value;
+        if(!name) return alert("Please enter a name");
+        const id = window.currentEditId || name.replace(/[^a-zA-Z0-9]/g, "_");
+        set(ref(db, 'students/' + id), { name, dob, phone, photo: window.photoData });
+        resetForm();
+    };
+
+    window.editStudent = (id) => {
+        const s = window.students.find(x => x.id === id);
+        window.currentEditId = id;
+        document.getElementById('sName').value = s.name;
+        document.getElementById('sDOB').value = s.dob || "";
+        document.getElementById('sPhone').value = s.phone || "";
+        window.photoData = s.photo || "";
+        document.getElementById('preview').src = s.photo || "";
+        document.getElementById('preview').style.display = s.photo ? 'block' : 'none';
+        document.getElementById('mode-label').innerText = "Update Profile";
+        document.getElementById('cancel-btn').style.display = 'block';
+        showPage('edit-page', document.getElementById('nav-manage'));
+    };
+
+    window.mark = (id, type) => {
+        const day = new Date().toISOString().split('T')[0];
+        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const logRef = ref(db, `attendance/${day}/${id}/${type}`);
+        onValue(logRef, (s) => {
+            let list = s.val() || [];
+            list.push(time);
+            set(logRef, list);
+        }, { onlyOnce: true });
+    };
+
+    window.initCamera = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById('video').srcObject = stream;
+        document.getElementById('video').style.display = 'block';
+        document.getElementById('snap').style.display = 'inline-block';
+        window.camStream = stream;
+    };
+
+    window.takeSnapshot = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320; canvas.height = 240;
+        canvas.getContext('2d').drawImage(document.getElementById('video'), 0, 0, 320, 240);
+        window.photoData = canvas.toDataURL('image/jpeg', 0.5);
+        document.getElementById('preview').src = window.photoData;
+        document.getElementById('preview').style.display = 'block';
+        window.camStream.getTracks().forEach(t => t.stop());
+        document.getElementById('video').style.display = 'none';
+        document.getElementById('snap').style.display = 'none';
+    };
+
+    window.handleFileUpload = (e) => {
+        const r = new FileReader();
+        r.onload = (ev) => {
+            window.photoData = ev.target.result;
+            document.getElementById('preview').src = ev.target.result;
+            document.getElementById('preview').style.display = 'block';
+        };
+        r.readAsDataURL(e.target.files[0]);
+    };
+
+    window.updateUserPass = () => {
+        const user = document.getElementById('user-select').value;
+        const pass = document.getElementById('edit-pass').value;
+        if(pass) set(ref(db, 'users/' + user), pass).then(() => alert("Saved!"));
+    };
+
+    window.exportData = () => {
+        onValue(ref(db), (s) => {
+            const blob = new Blob([JSON.stringify(s.val())], {type: 'application/json'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'full_backup.json'; a.click();
+        }, {onlyOnce: true});
+    };
+
+    window.restoreData = (e) => {
+        const r = new FileReader();
+        r.onload = (ev) => set(ref(db), JSON.parse(ev.target.result)).then(() => alert("Restored!"));
+        r.readAsText(e.target.files[0]);
+    };
+
+    window.resetForm = () => {
+        window.currentEditId = null; window.photoData = "";
+        document.getElementById('sName').value = ""; document.getElementById('sDOB').value = ""; document.getElementById('sPhone').value = "";
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('mode-label').innerText = "Register Student";
+        document.getElementById('cancel-btn').style.display = 'none';
+    };
+
+    window.showPage = (id, el) => {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+        if(el) el.classList.add('active');
+    };
+
+    window.filterTable = (id, val) => {
+        document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.toLowerCase().includes(val.toLowerCase()) ? "" : "none");
+    };
+
+    window.delStudent = (id) => { if(confirm("Delete student?")) remove(ref(db, 'students/' + id)); };
+</script>
+</body>
+</html>
